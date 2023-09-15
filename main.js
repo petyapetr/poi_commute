@@ -99,8 +99,6 @@ map.add(busStopsLayer);
 // set widget and renderer when layer is loaded
 view.whenLayerView(poiLayer).then(
 	(layerView) => {
-		console.log("success");
-
 		// Define categories and create a widget
 		const categories = poiLayer.renderer.uniqueValueGroups[0].classes.map((val) => val.label);
 		const filterNode = document.createElement("div");
@@ -112,9 +110,26 @@ view.whenLayerView(poiLayer).then(
 		filterNode.addEventListener("click", filterByCategory);
 		function filterByCategory(event) {
 			const selectedCategory = event.target.getAttribute("category-data");
+			
 			layerView.filter = {
 				where: `category_name = '${selectedCategory}'`,
 			};
+
+			// close popup if other category
+			if (view.popup.visible) {
+				const featureName = view.popup.content.title;
+				const query = {
+					where: `name = '${featureName}'`,
+					returnGeometry: false,
+					outFields: ["category_name"],
+				};
+				poiLayer.queryFeatures(query).then((res) => {
+					const popupCategory = res.features[0].attributes.category_name;
+					if (popupCategory !== selectedCategory) {
+						view.closePopup();
+					}
+				});
+			}
 		}
 		filterExpand.watch("expanded", () => {
 			if (!filterExpand.expanded) {
