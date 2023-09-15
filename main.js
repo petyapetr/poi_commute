@@ -99,30 +99,28 @@ map.add(busStopsLayer);
 // set widget and renderer when layer is loaded
 view.whenLayerView(poiLayer).then(
 	(layerView) => {
-		const poiLayerView = layerView
 		console.log("success");
+
 		// Define categories and create a widget
 		const categories = poiLayer.renderer.uniqueValueGroups[0].classes.map((val) => val.label);
-		// const filterNode = document.getElementById("filter-widget-container");
 		const filterNode = document.createElement("div");
 		filterNode.classList.add("filter-widget-container");
 		const filterExpand = setupFilterWidget(categories, filterNode);
 		view.ui.add(filterExpand, "top-right");
-		// filterExpand.watch("expanded");
 
 		// create filter watcher
-		// click event handler for seasons choices
 		filterNode.addEventListener("click", filterByCategory);
-
 		function filterByCategory(event) {
 			const selectedCategory = event.target.getAttribute("category-data");
-
-			console.log(selectedCategory);
-			console.log(selectedCategory);
-			poiLayerView.filter = {
+			layerView.filter = {
 				where: `category_name = '${selectedCategory}'`,
 			};
 		}
+		filterExpand.watch("expanded", () => {
+			if (!filterExpand.expanded) {
+				layerView.filter = null;
+			}
+		});
 
 		// setup a poi renderer style
 		// const colors = poiLayer.renderer.
