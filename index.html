@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>POI Commute</title>
+
+		<link rel="stylesheet" href="https://js.arcgis.com/4.27/esri/themes/light/main.css" />
+		<script src="./main.js" type="module"></script>
+
+		<style>
+			html,
+			body,
+			#viewDiv {
+				padding: 0;
+				margin: 0;
+				height: 100%;
+				width: 100%;
+			}
+
+			.filter-widget-container {
+				background-color: white;
+			}
+
+			.esri-expand__content--expanded {
+				overflow: scroll;
+			}
+
+			.category-item {
+				width: 100%;
+				padding: 12px;
+				text-align: center;
+				vertical-align: baseline;
+				cursor: pointer;
+			}
+
+			.category-item:focus {
+				background-color: dimgrey;
+			}
+
+			.category-item:hover {
+				background-color: dimgrey;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="filter-widget-container"></div>
+		<div id="viewDiv"></div>
+	</body>
+</html>
