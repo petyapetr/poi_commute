@@ -4,11 +4,11 @@ import SceneView from "https://js.arcgis.com/4.27/@arcgis/core/views/SceneView.j
 import FeatureLayer from "https://js.arcgis.com/4.27/@arcgis/core/layers/FeatureLayer.js";
 import SceneLayer from "https://js.arcgis.com/4.27/@arcgis/core/layers/SceneLayer.js";
 import Expand from "https://js.arcgis.com/4.27/@arcgis/core/widgets/Expand.js";
+import * as reactiveUtils from "https://js.arcgis.com/4.27/@arcgis/core/core/reactiveUtils.js";
 
 // Initiallization
 esriConfig.apiKey =
 	"AAPK5768bdfdf6934d3f9e993b500647accdENViXgjJamoSamjjq4X1Orw00pCFHyN3scHiqRbw5vblcXzfL4WuLL6O06X9MnwF";
-
 const map = new Map({
 	basemap: "osm-streets-relief",
 	ground: "world-elevation",
@@ -25,6 +25,25 @@ const view = new SceneView({
 		tilt: 75,
 	},
 });
+
+// Store
+let selectedFeature = {
+	active: false,
+	geometry: null,
+	attributes: null,
+	setDefault() {
+		this.active = false;
+		this.geometry = null;
+		this.attributes = null;
+	},
+	setParams(params) {
+		const {attributes, geometry} = params;
+		this.active = true;
+		this.geometry = geometry;
+		this.attributes = attributes;
+	},
+};
+let busLayerView = null;
 
 const buildingsLayer = new SceneLayer({
 	url: "https://basemaps3d.arcgis.com/arcgis/rest/services/OpenStreetMap3D_Buildings_v1/SceneServer",
@@ -89,62 +108,68 @@ const poiLayer = new FeatureLayer({
 	popupTemplate: poiPopup,
 	// renderer: poiRenderer,
 });
-const busStopsLayer = new FeatureLayer({
+const busLayer = new FeatureLayer({
 	url: "https://services4.arcgis.com/XZEtqni2CM1tP1ZM/arcgis/rest/services/Bus_Service_WFL1/FeatureServer/1",
 });
 
 map.add(poiLayer);
-map.add(busStopsLayer);
+map.add(busLayer);
 
-// set widget and renderer when layer is loaded
-view.whenLayerView(poiLayer).then(
-	(layerView) => {
+// setup filter
+view
+	.whenLayerView(poiLayer)
+	.then((layerView) => {
 		// Define categories and create a widget
 		const categories = poiLayer.renderer.uniqueValueGroups[0].classes.map((val) => val.label);
 		const filterNode = document.createElement("div");
 		filterNode.classList.add("filter-widget-container");
-		const filterExpand = setupFilterWidget(categories, filterNode);
-		view.ui.add(filterExpand, "top-right");
+		const filterExpandWidget = createFilterWidget(categories, filterNode);
+		view.ui.add(filterExpandWidget, "top-right");
 
 		// create filter watcher
 		filterNode.addEventListener("click", filterByCategory);
 		function filterByCategory(event) {
 			const selectedCategory = event.target.getAttribute("category-data");
-			
+
 			layerView.filter = {
 				where: `category_name = '${selectedCategory}'`,
 			};
 
 			// close popup if other category
-			if (view.popup.visible) {
-				const featureName = view.popup.content.title;
-				const query = {
-					where: `name = '${featureName}'`,
-					returnGeometry: false,
-					outFields: ["category_name"],
-				};
-				poiLayer.queryFeatures(query).then((res) => {
-					const popupCategory = res.features[0].attributes.category_name;
-					if (popupCategory !== selectedCategory) {
-						view.closePopup();
-					}
-				});
-			}
+			togglePopup(selectedCategory);
 		}
-		filterExpand.watch("expanded", () => {
-			if (!filterExpand.expanded) {
+		filterExpandWidget.watch("expanded", () => {
+			if (!filterExpandWidget.expanded) {
 				layerView.filter = null;
 			}
 		});
 
-		// setup a poi renderer style
-		// const colors = poiLayer.renderer.
-		poiLayer.renderer = poiRenderer;
-	},
-	(err) => console.log(err)
-);
+		poiLayer.renderer = poiRenderer; //TODO add icon styles
+	})
+	.catch((err) => console.error(err));
 
-function setupFilterWidget(categories, node) {
+// create watcher for a poi bus spatial filter
+view.on("click", (event) => {
+	console.log("caught an event");
+	view.hitTest(event, {include: poiLayer}).then((hitTestResult) => {
+		if (hitTestResult.results.length) {
+			toggleSpatialFilter(busLayerView, true, hitTestResult.results[0].graphic.geometry);
+		} else {
+			console.log("clicked white space");
+			toggleSpatialFilter(busLayerView, false);
+		}
+	});
+});
+
+view
+	.whenLayerView(busLayer)
+	.then((layerView) => {
+		busLayerView = layerView;
+	})
+	.catch((err) => console.error(err));
+
+// services
+function createFilterWidget(categories, node) {
 	categories.forEach((name) => {
 		const childNode = document.createElement("div");
 
@@ -165,4 +190,42 @@ function setupFilterWidget(categories, node) {
 	return filterWidget;
 }
 
+function togglePopup(selectedCategory) {
+	try {
+		if (view.popup.visible) {
+			const featureName = view.popup.content.title;
+			const query = {
+				where: `name = '${featureName}'`,
+				returnGeometry: false,
+				outFields: ["category_name"],
+			};
+			poiLayer.queryFeatures(query).then((res) => {
+				const popupCategory = res.features[0].attributes.category_name;
+				if (popupCategory !== selectedCategory) {
+					view.closePopup();
+					toggleSpatialFilter(busLayerView, false);
+				}
+			});
+		}
+	} catch (err) {
+		console.log(err);
+		view.closePopup();
+		toggleSpatialFilter(busLayerView, false);
+	}
+}
 
+function toggleSpatialFilter(layerView, apply, geometry) {
+	console.log(busLayerView);
+	if (!layerView) {
+		console.error("Bus layer view is disabled");
+		return;
+	}
+
+	if (!apply) {
+		layerView.filter = null;
+		console.log("disabled spatial filter");
+		return;
+	}
+
+	console.log("applyed spatial filter", geometry);
+}

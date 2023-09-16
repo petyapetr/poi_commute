@@ -28,3 +28,4 @@ jspm_packages/
 .env.local
 
 *.md
+.vscode/bookmarks.json
