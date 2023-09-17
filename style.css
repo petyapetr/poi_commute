@@ -1,0 +1,32 @@
+html,
+body,
+#viewDiv {
+	padding: 0;
+	margin: 0;
+	height: 100%;
+	width: 100%;
+}
+
+.filter-widget-container {
+	background-color: white;
+}
+
+.esri-expand__content--expanded {
+	overflow: scroll;
+}
+
+.category-item {
+	width: 100%;
+	padding: 12px;
+	text-align: center;
+	vertical-align: baseline;
+	cursor: pointer;
+}
+
+.category-item:focus {
+	background-color: dimgrey;
+}
+
+.category-item:hover {
+	background-color: dimgrey;
+}
