@@ -115,6 +115,15 @@ const busLayer = new FeatureLayer({
 map.add(poiLayer);
 map.add(busLayer);
 
+// setup bus layer view
+view
+	.whenLayerView(busLayer)
+	.then((layerView) => {
+		console.log("here we go bus initiated", layerView);
+		busLayerView = layerView;
+	})
+	.catch((err) => console.error(err));
+
 // setup filter
 view
 	.whenLayerView(poiLayer)
@@ -128,6 +137,7 @@ view
 
 		// create filter watcher
 		filterNode.addEventListener("click", filterByCategory);
+
 		function filterByCategory(event) {
 			const selectedCategory = event.target.getAttribute("category-data");
 
@@ -136,7 +146,9 @@ view
 			};
 
 			// close popup if other category
-			togglePopup(selectedCategory);
+			if (view.popup.visible) {
+				togglePopup(selectedCategory, busLayerView);
+			}
 		}
 		filterExpandWidget.watch("expanded", () => {
 			if (!filterExpandWidget.expanded) {
@@ -150,23 +162,14 @@ view
 
 // create watcher for a poi bus spatial filter
 view.on("click", (event) => {
-	console.log("caught an event");
 	view.hitTest(event, {include: poiLayer}).then((hitTestResult) => {
 		if (hitTestResult.results.length) {
 			toggleSpatialFilter(busLayerView, true, hitTestResult.results[0].graphic.geometry);
 		} else {
-			console.log("clicked white space");
 			toggleSpatialFilter(busLayerView, false);
 		}
 	});
 });
-
-view
-	.whenLayerView(busLayer)
-	.then((layerView) => {
-		busLayerView = layerView;
-	})
-	.catch((err) => console.error(err));
 
 // services
 function createFilterWidget(categories, node) {
@@ -190,23 +193,22 @@ function createFilterWidget(categories, node) {
 	return filterWidget;
 }
 
-function togglePopup(selectedCategory) {
+function togglePopup(selectedCategory, busLayerView) {
 	try {
-		if (view.popup.visible) {
-			const featureName = view.popup.content.title;
-			const query = {
-				where: `name = '${featureName}'`,
-				returnGeometry: false,
-				outFields: ["category_name"],
-			};
-			poiLayer.queryFeatures(query).then((res) => {
-				const popupCategory = res.features[0].attributes.category_name;
-				if (popupCategory !== selectedCategory) {
-					view.closePopup();
-					toggleSpatialFilter(busLayerView, false);
-				}
-			});
-		}
+		const featureName = view.popup.content.title;
+		const query = {
+			where: `name = '${featureName}'`,
+			returnGeometry: false,
+			outFields: ["category_name"],
+		};
+
+		poiLayer.queryFeatures(query).then((res) => {
+			const popupCategory = res.features[0].attributes.category_name;
+			if (popupCategory !== selectedCategory) {
+				view.closePopup();
+				toggleSpatialFilter(busLayerView, false);
+			}
+		});
 	} catch (err) {
 		console.log(err);
 		view.closePopup();
@@ -214,8 +216,7 @@ function togglePopup(selectedCategory) {
 	}
 }
 
-function toggleSpatialFilter(layerView, apply, geometry) {
-	console.log(busLayerView);
+function toggleSpatialFilter(layerView, apply, point) {
 	if (!layerView) {
 		console.error("Bus layer view is disabled");
 		return;
@@ -227,5 +228,15 @@ function toggleSpatialFilter(layerView, apply, geometry) {
 		return;
 	}
 
-	console.log("applyed spatial filter", geometry);
+	if (!point) {
+		console.error("no point geometry provided");
+		return;
+	}
+
+	layerView.filter = {
+		geometry: point,
+		distance: 500,
+		units: "meters",
+		spatialRelationship: "intersects",
+	};
 }
