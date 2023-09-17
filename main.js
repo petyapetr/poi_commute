@@ -121,7 +121,7 @@ view
 		const filterExpandWidget = createFilterWidget(poiLayer, filterNode);
 		view.ui.add(filterExpandWidget, "top-right");
 
-		// create filter watcher
+		// create filter node watcher
 		filterNode.addEventListener("click", filterByCategory);
 
 		// implement filter functionallity
@@ -134,8 +134,9 @@ view
 
 			// close popup if other category
 			if (view.popup.visible) {
-				checkPopupCategory(selectedCategory);
-				togglePopup(selectedCategory, busLayerView);
+				checkPopupCategory(selectedCategory, poiLayer).then((res) =>
+					togglePopup(res, busLayerView)
+				);
 			}
 		}
 
@@ -151,17 +152,36 @@ view
 	})
 	.catch((err) => console.error(err));
 
-// create watcher for a poi to spatial filter bus stations
+// create view watcher of a poi to spatial filter bus stations
 view.on("click", (event) => {
 	view.hitTest(event, {include: poiLayer}).then((hitTestResult) => {
 		if (hitTestResult.results.length) {
 			toggleSpatialFilter(busLayerView, true, hitTestResult.results[0].graphic.geometry);
-		} else {
-			console.log("miss clicked disable");
+			return;
+		}
+
+		if (busLayerView.filter) {
+			console.log("no feature on click disable");
 			toggleSpatialFilter(busLayerView, false);
+			return;
 		}
 	});
 });
+
+// create a popup watcher for a spatial filter of bus stops
+reactiveUtils.watch(
+	() => view.popup.visible,
+	(newVal, oldVal) => {
+		if (typeof oldVal !== "boolean") {
+			return;
+		}
+
+		if (newVal === false && busLayerView.filter !== null) {
+			console.log("popup action disable");
+			toggleSpatialFilter(busLayerView, false);
+		}
+	}
+);
 
 // services
 function createFilterWidget(layer, node) {
@@ -191,34 +211,38 @@ function populateFilterWidget(categories, node) {
 	});
 }
 
-function checkPopupCategory(selectedCategory) {
-	const featureName = view.popup.content;
-	console.log(featureName);
-} // TODO implement better filterring based on more than just a feature title
+function checkPopupCategory(selectedCategory, layer) {
+	const featureAttributes = view.popup.content.viewModel._graphicExpressionAttributes;
+	const queryParams = {
+		objectIds: [featureAttributes.OBJECTID],
+		returnGeometry: false,
+		outFields: ["category_name"],
+	};
 
-function togglePopup(selectedCategory, busLayerView) {
-	try {
-		const featureName = view.popup.content.title;
-		const query = {
-			where: `name = '${featureName}'`,
-			returnGeometry: false,
-			outFields: ["category_name"],
-		};
+	return new Promise((resolve) => {
+		try {
+			layer.queryFeatures(queryParams).then((res) => {
+				const featureCategory = res.features[0].attributes.category_name;
+				if (featureCategory !== selectedCategory) {
+					resolve(false);
+				}
+				resolve(true);
+			});
+		} catch (err) {
+			console.error(err);
+			resolve(false);
+		}
+	});
+}
 
-		poiLayer.queryFeatures(query).then((res) => {
-			const popupCategory = res.features[0].attributes.category_name;
-			if (popupCategory !== selectedCategory) {
-				view.closePopup();
-				console.log("filter category miss match disable");
-				toggleSpatialFilter(busLayerView, false);
-			}
-		});
-	} catch (err) {
-		console.log(err);
-		view.closePopup();
-		console.log("filter category miss match disable");
-		toggleSpatialFilter(busLayerView, false);
+function togglePopup(category, layerView) {
+	if (category) {
+		return;
 	}
+
+	view.popup.close();
+	console.log("filter category miss match disable");
+	toggleSpatialFilter(layerView, false);
 }
 
 function toggleSpatialFilter(layerView, apply, point) {
@@ -246,18 +270,3 @@ function toggleSpatialFilter(layerView, apply, point) {
 		spatialRelationship: "intersects",
 	};
 }
-
-reactiveUtils.watch(
-	() => view.popup.visible,
-	(newVal, oldVal) => {
-		if (typeof oldVal !== "boolean") {
-			console.log("initial visability change", newVal, oldVal);
-			return;
-		}
-
-		if (newVal === false && busLayerView.filter !== null) {
-			console.log("popup action disable");
-			toggleSpatialFilter(busLayerView, false);
-		}
-	}
-);
