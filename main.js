@@ -6,7 +6,7 @@ import SceneLayer from "https://js.arcgis.com/4.27/@arcgis/core/layers/SceneLaye
 import Expand from "https://js.arcgis.com/4.27/@arcgis/core/widgets/Expand.js";
 import * as reactiveUtils from "https://js.arcgis.com/4.27/@arcgis/core/core/reactiveUtils.js";
 
-// Initiallization
+// initiallization
 esriConfig.apiKey =
 	"AAPK5768bdfdf6934d3f9e993b500647accdENViXgjJamoSamjjq4X1Orw00pCFHyN3scHiqRbw5vblcXzfL4WuLL6O06X9MnwF";
 const map = new Map({
@@ -26,9 +26,10 @@ const view = new SceneView({
 	},
 });
 
-// Store
+// store
 let busLayerView = null;
 
+// 3D Layers
 const buildingsLayer = new SceneLayer({
 	url: "https://basemaps3d.arcgis.com/arcgis/rest/services/OpenStreetMap3D_Buildings_v1/SceneServer",
 	popupEnabled: false,
@@ -36,7 +37,7 @@ const buildingsLayer = new SceneLayer({
 });
 map.add(buildingsLayer);
 
-// Definning Popups
+// definning Popups
 const poiPopup = {
 	title: "{name}",
 	content: `<b>Category:</b> {category_name}<br><b>Address:</b> {address_name}<br><b>Coordinates:</b> {latitude} N, {longitude} E<br>`,
@@ -50,6 +51,7 @@ view.popup = {
 	},
 };
 
+// definning Renderers
 const poiRenderer = {
 	type: "unique-value",
 	field: "category_name",
@@ -86,6 +88,7 @@ const poiRenderer = {
 	},
 };
 
+// 2D Layers
 const poiLayer = new FeatureLayer({
 	url: "https://services4.arcgis.com/XZEtqni2CM1tP1ZM/ArcGIS/rest/services/YerevanPOIs/FeatureServer/1",
 	outFields: ["name", "category_name", "address_name", "telephone", "latitude", "longitude"],
@@ -99,7 +102,7 @@ const busLayer = new FeatureLayer({
 map.add(poiLayer);
 map.add(busLayer);
 
-// setup bus layer view
+// store bus layer view
 view
 	.whenLayerView(busLayer)
 	.then((layerView) => {
@@ -111,16 +114,17 @@ view
 view
 	.whenLayerView(poiLayer)
 	.then((layerView) => {
-		// Define categories and create a widget
-		const categories = poiLayer.renderer.uniqueValueGroups[0].classes.map((val) => val.label);
+		// create a filter widget
 		const filterNode = document.createElement("div");
 		filterNode.classList.add("filter-widget-container");
-		const filterExpandWidget = createFilterWidget(categories, filterNode);
+
+		const filterExpandWidget = createFilterWidget(poiLayer, filterNode);
 		view.ui.add(filterExpandWidget, "top-right");
 
 		// create filter watcher
 		filterNode.addEventListener("click", filterByCategory);
 
+		// implement filter functionallity
 		function filterByCategory(event) {
 			const selectedCategory = event.target.getAttribute("category-data");
 
@@ -130,33 +134,52 @@ view
 
 			// close popup if other category
 			if (view.popup.visible) {
+				checkPopupCategory(selectedCategory);
 				togglePopup(selectedCategory, busLayerView);
 			}
 		}
+
+		// drop filters when clossed
 		filterExpandWidget.watch("expanded", () => {
 			if (!filterExpandWidget.expanded) {
 				layerView.filter = null;
 			}
 		});
 
+		// apply renderer style
 		poiLayer.renderer = poiRenderer; //TODO add icon styles
 	})
 	.catch((err) => console.error(err));
 
-// create watcher for a poi bus spatial filter
+// create watcher for a poi to spatial filter bus stations
 view.on("click", (event) => {
 	view.hitTest(event, {include: poiLayer}).then((hitTestResult) => {
 		if (hitTestResult.results.length) {
 			toggleSpatialFilter(busLayerView, true, hitTestResult.results[0].graphic.geometry);
 		} else {
-			toggleSpatialFilter(busLayerView, false); 
-			// click also eefects popup visability even if it was closed prior, so it doubles disabling filter func
+			console.log("miss clicked disable");
+			toggleSpatialFilter(busLayerView, false);
 		}
 	});
 });
 
 // services
-function createFilterWidget(categories, node) {
+function createFilterWidget(layer, node) {
+	const categories = layer.renderer.uniqueValueGroups[0].classes.map((val) => val.label);
+
+	populateFilterWidget(categories, node);
+
+	const widget = new Expand({
+		content: node,
+		view: view,
+		expandIcon: "filter",
+		id: "filter_widget",
+	});
+
+	return widget;
+}
+
+function populateFilterWidget(categories, node) {
 	categories.forEach((name) => {
 		const childNode = document.createElement("div");
 
@@ -166,16 +189,12 @@ function createFilterWidget(categories, node) {
 
 		node.appendChild(childNode);
 	});
-
-	const filterWidget = new Expand({
-		content: node,
-		view: view,
-		expandIcon: "filter",
-		id: "filter_widget",
-	});
-
-	return filterWidget;
 }
+
+function checkPopupCategory(selectedCategory) {
+	const featureName = view.popup.content;
+	console.log(featureName);
+} // TODO implement better filterring based on more than just a feature title
 
 function togglePopup(selectedCategory, busLayerView) {
 	try {
@@ -190,12 +209,14 @@ function togglePopup(selectedCategory, busLayerView) {
 			const popupCategory = res.features[0].attributes.category_name;
 			if (popupCategory !== selectedCategory) {
 				view.closePopup();
+				console.log("filter category miss match disable");
 				toggleSpatialFilter(busLayerView, false);
 			}
 		});
 	} catch (err) {
 		console.log(err);
 		view.closePopup();
+		console.log("filter category miss match disable");
 		toggleSpatialFilter(busLayerView, false);
 	}
 }
@@ -217,6 +238,7 @@ function toggleSpatialFilter(layerView, apply, point) {
 		return;
 	}
 
+	console.log("apply filter");
 	layerView.filter = {
 		geometry: point,
 		distance: 500,
@@ -225,10 +247,17 @@ function toggleSpatialFilter(layerView, apply, point) {
 	};
 }
 
-reactiveUtils.when(
-	() => view.popup.visible === false,
+reactiveUtils.watch(
+	() => view.popup.visible,
 	(newVal, oldVal) => {
-		console.log("change popup visability", newVal, oldVal);
-		toggleSpatialFilter(busLayerView, false);
+		if (typeof oldVal !== "boolean") {
+			console.log("initial visability change", newVal, oldVal);
+			return;
+		}
+
+		if (newVal === false && busLayerView.filter !== null) {
+			console.log("popup action disable");
+			toggleSpatialFilter(busLayerView, false);
+		}
 	}
-); // TODO fix behevior when clicking
+);
