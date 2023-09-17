@@ -27,22 +27,6 @@ const view = new SceneView({
 });
 
 // Store
-let selectedFeature = {
-	active: false,
-	geometry: null,
-	attributes: null,
-	setDefault() {
-		this.active = false;
-		this.geometry = null;
-		this.attributes = null;
-	},
-	setParams(params) {
-		const {attributes, geometry} = params;
-		this.active = true;
-		this.geometry = geometry;
-		this.attributes = attributes;
-	},
-};
 let busLayerView = null;
 
 const buildingsLayer = new SceneLayer({
@@ -119,7 +103,6 @@ map.add(busLayer);
 view
 	.whenLayerView(busLayer)
 	.then((layerView) => {
-		console.log("here we go bus initiated", layerView);
 		busLayerView = layerView;
 	})
 	.catch((err) => console.error(err));
@@ -166,7 +149,8 @@ view.on("click", (event) => {
 		if (hitTestResult.results.length) {
 			toggleSpatialFilter(busLayerView, true, hitTestResult.results[0].graphic.geometry);
 		} else {
-			toggleSpatialFilter(busLayerView, false);
+			toggleSpatialFilter(busLayerView, false); 
+			// click also eefects popup visability even if it was closed prior, so it doubles disabling filter func
 		}
 	});
 });
@@ -240,3 +224,11 @@ function toggleSpatialFilter(layerView, apply, point) {
 		spatialRelationship: "intersects",
 	};
 }
+
+reactiveUtils.when(
+	() => view.popup.visible === false,
+	(newVal, oldVal) => {
+		console.log("change popup visability", newVal, oldVal);
+		toggleSpatialFilter(busLayerView, false);
+	}
+); // TODO fix behevior when clicking
