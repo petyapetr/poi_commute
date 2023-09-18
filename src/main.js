@@ -72,7 +72,7 @@ const poiRenderer = {
 		],
 
 		verticalOffset: {
-			screenLength: 40,
+			screenLength: 50,
 			maxWorldLength: 200,
 			minWorldLength: 35,
 		},
@@ -87,6 +87,33 @@ const poiRenderer = {
 		},
 	},
 };
+const busRenderer = {
+	type: "simple",
+	symbol: {
+		type: "point-3d",
+		symbolLayers: [
+			{
+				type: "icon",
+				resource: {
+					primitive: "circle",
+					href: "./../src/assets/bus.svg", // important note path should be relative to an html file
+				},
+				// size: 15,
+				material: {color: "#c2c2c2"},
+			},
+		],
+		verticalOffset: {
+			screenLength: 20,
+			maxWorldLength: 200,
+			minWorldLength: 35,
+		},
+		callout: {
+			type: "line",
+			color: "black",
+			size: 2,
+		},
+	},
+};
 
 // 2D Layers
 const poiLayer = new FeatureLayer({
@@ -97,6 +124,10 @@ const poiLayer = new FeatureLayer({
 });
 const busLayer = new FeatureLayer({
 	url: "https://services4.arcgis.com/XZEtqni2CM1tP1ZM/arcgis/rest/services/Bus_Service_WFL1/FeatureServer/1",
+	elevationInfo: {
+		mode: "relative-to-scene",
+	},
+	renderer: busRenderer,
 });
 
 map.add(poiLayer);
