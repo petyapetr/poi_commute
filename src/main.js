@@ -93,7 +93,6 @@ const poiRenderer = {
 	}, */
 	uniqueValueInfos: null,
 };
-
 const busRenderer = {
 	type: "simple",
 	symbol: {
@@ -126,14 +125,20 @@ const poiLayer = new FeatureLayer({
 	url: "https://services4.arcgis.com/XZEtqni2CM1tP1ZM/ArcGIS/rest/services/YerevanPOIs/FeatureServer/1",
 	outFields: ["name", "category_name", "address_name", "telephone", "latitude", "longitude"],
 	popupTemplate: poiPopup,
-	// renderer: poiRenderer,
+	elevationInfo: {
+		mode: "relative-to-scene",
+	},
+	screenSizePerspectiveEnabled: true,
+	featureReduction: {
+		type: "selection",
+	},
 });
 const busLayer = new FeatureLayer({
 	url: "https://services4.arcgis.com/XZEtqni2CM1tP1ZM/arcgis/rest/services/Bus_Service_WFL1/FeatureServer/1",
 	elevationInfo: {
 		mode: "relative-to-scene",
 	},
-	renderer: busRenderer,
+	// renderer: busRenderer,
 });
 
 map.add(poiLayer);
