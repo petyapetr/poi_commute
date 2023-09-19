@@ -164,8 +164,8 @@ view
 		// create a filter widget
 		const filterNode = document.createElement("div");
 		filterNode.classList.add("filter-widget-container");
-		
-		const filterExpandWidget = createFilterWidget(poiLayer, filterNode);
+
+		const filterExpandWidget = createFilterWidget(categories, filterNode);
 		view.ui.add(filterExpandWidget, "top-right");
 
 		// create filter node watcher
@@ -228,9 +228,7 @@ reactiveUtils.watch(
 );
 
 // services
-function createFilterWidget(layer, node) {
-	const categories = layer.renderer.uniqueValueGroups[0].classes.map((val) => val.label);
-
+function createFilterWidget(categories, node) {
 	populateFilterWidget(categories, node);
 
 	const widget = new Expand({
@@ -328,6 +326,7 @@ function getUniqueValueSymbol(symbol) {
 			resource: {
 				primitive: "circle",
 				// href: "url", // important note path should be relative to an html file
+				// TODO add icons
 			},
 			size: 20,
 			material: {color: "white"},
