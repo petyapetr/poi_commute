@@ -27,6 +27,11 @@ const view = new SceneView({
 });
 
 // store
+const verticalOffset = {
+	screenLength: 20,
+	maxWorldLength: 200,
+	minWorldLength: 35,
+};
 let busLayerView = null;
 
 // 3D Layers
@@ -55,7 +60,7 @@ view.popup = {
 const poiRenderer = {
 	type: "unique-value",
 	field: "category_name",
-	defaultSymbol: {
+	/* defaultSymbol: {
 		type: "point-3d",
 		symbolLayers: [
 			{
@@ -85,8 +90,10 @@ const poiRenderer = {
 				color: "#D13470",
 			},
 		},
-	},
+	}, */
+	uniqueValueInfos: null,
 };
+
 const busRenderer = {
 	type: "simple",
 	symbol: {
@@ -102,15 +109,14 @@ const busRenderer = {
 				material: {color: "#c2c2c2"},
 			},
 		],
-		verticalOffset: {
-			screenLength: 20,
-			maxWorldLength: 200,
-			minWorldLength: 35,
-		},
+		verticalOffset: verticalOffset,
 		callout: {
 			type: "line",
-			color: "black",
+			color: "white",
 			size: 2,
+			border: {
+				color: "black",
+			},
 		},
 	},
 };
@@ -145,10 +151,20 @@ view
 view
 	.whenLayerView(poiLayer)
 	.then((layerView) => {
+		// set renderer
+		const categories = [];
+		const uniqueValueInfos = poiLayer.renderer.toJSON().uniqueValueInfos.map((el) => {
+			categories.push(el.value);
+			const symbol = getUniqueValueSymbol(el.symbol);
+			return {value: el.value, symbol};
+		});
+		poiRenderer.uniqueValueInfos = uniqueValueInfos;
+		poiLayer.renderer = poiRenderer;
+
 		// create a filter widget
 		const filterNode = document.createElement("div");
 		filterNode.classList.add("filter-widget-container");
-
+		
 		const filterExpandWidget = createFilterWidget(poiLayer, filterNode);
 		view.ui.add(filterExpandWidget, "top-right");
 
@@ -177,9 +193,6 @@ view
 				layerView.filter = null;
 			}
 		});
-
-		// apply renderer style
-		poiLayer.renderer = poiRenderer; //TODO add icon styles
 	})
 	.catch((err) => console.error(err));
 
@@ -300,4 +313,39 @@ function toggleSpatialFilter(layerView, apply, point) {
 		units: "meters",
 		spatialRelationship: "intersects",
 	};
+}
+
+function getUniqueValueSymbol(symbol) {
+	const color = [...symbol.color];
+	for (let key in symbol) {
+		delete symbol[key];
+	}
+
+	symbol.type = "point-3d";
+	symbol.symbolLayers = [
+		{
+			type: "icon",
+			resource: {
+				primitive: "circle",
+				// href: "url", // important note path should be relative to an html file
+			},
+			size: 20,
+			material: {color: "white"},
+			outline: {
+				color,
+				size: 2,
+			},
+		},
+	];
+	symbol.verticalOffset = verticalOffset;
+	symbol.callout = {
+		type: "line",
+		color: "white",
+		size: 2,
+		border: {
+			color,
+		},
+	};
+
+	return symbol;
 }
