@@ -60,64 +60,7 @@ view.popup = {
 const poiRenderer = {
 	type: "unique-value",
 	field: "category_name",
-	/* defaultSymbol: {
-		type: "point-3d",
-		symbolLayers: [
-			{
-				type: "icon", // autocasts as new IconSymbol3DLayer()
-				resource: {
-					href: "https://developers.arcgis.com/javascript/latest/sample-code/visualization-point-styles/live/Museum.png",
-				},
-				size: 20,
-				outline: {
-					color: "white",
-					size: 2,
-				},
-			},
-		],
-
-		verticalOffset: {
-			screenLength: 50,
-			maxWorldLength: 200,
-			minWorldLength: 35,
-		},
-
-		callout: {
-			type: "line", // autocasts as new LineCallout3D()
-			color: "white",
-			size: 2,
-			border: {
-				color: "#D13470",
-			},
-		},
-	}, */
 	uniqueValueInfos: null,
-};
-const busRenderer = {
-	type: "simple",
-	symbol: {
-		type: "point-3d",
-		symbolLayers: [
-			{
-				type: "icon",
-				resource: {
-					primitive: "circle",
-					href: "./../src/assets/bus.svg", // important note path should be relative to an html file
-				},
-				// size: 15,
-				material: {color: "#c2c2c2"},
-			},
-		],
-		verticalOffset: verticalOffset,
-		callout: {
-			type: "line",
-			color: "white",
-			size: 2,
-			border: {
-				color: "black",
-			},
-		},
-	},
 };
 
 // 2D Layers
@@ -138,13 +81,11 @@ const busLayer = new FeatureLayer({
 	elevationInfo: {
 		mode: "relative-to-scene",
 	},
-	// renderer: busRenderer,
 });
 
 map.add(poiLayer);
 map.add(busLayer);
 
-// store bus layer view
 view
 	.whenLayerView(busLayer)
 	.then((layerView) => {
@@ -152,69 +93,15 @@ view
 	})
 	.catch((err) => console.error(err));
 
-// setup filter
 view
 	.whenLayerView(poiLayer)
 	.then((layerView) => {
-		// set renderer
-		const categories = [];
-		const uniqueValueInfos = poiLayer.renderer.toJSON().uniqueValueInfos.map((el) => {
-			categories.push(el.value);
-			const symbol = getUniqueValueSymbol(el.symbol);
-			return {value: el.value, symbol};
-		});
-		poiRenderer.uniqueValueInfos = uniqueValueInfos;
-		poiLayer.renderer = poiRenderer;
-
-		// create a filter widget
-		const filterNode = document.createElement("div");
-		filterNode.classList.add("filter-widget-container");
-
-		const filterExpandWidget = createFilterWidget(categories, filterNode);
-		view.ui.add(filterExpandWidget, "top-right");
-
-		// create filter node watcher
-		filterNode.addEventListener("click", filterByCategory);
-
-		// implement filter functionallity
-		function filterByCategory(event) {
-			const selectedCategory = event.target.getAttribute("category-data");
-
-			layerView.filter = {
-				where: `category_name = '${selectedCategory}'`,
-			};
-
-			// close popup if other category
-			if (view.popup.visible) {
-				checkPopupCategory(selectedCategory, poiLayer).then((res) =>
-					togglePopup(res, busLayerView)
-				);
-			}
-		}
-
-		// drop filters when clossed
-		filterExpandWidget.watch("expanded", () => {
-			if (!filterExpandWidget.expanded) {
-				layerView.filter = null;
-			}
-		});
+		initPOILayer(layerView);
 	})
 	.catch((err) => console.error(err));
 
-// create view watcher of a poi to spatial filter bus stations
 view.on("click", (event) => {
-	view.hitTest(event, {include: poiLayer}).then((hitTestResult) => {
-		if (hitTestResult.results.length) {
-			toggleSpatialFilter(busLayerView, true, hitTestResult.results[0].graphic.geometry);
-			return;
-		}
-
-		if (busLayerView.filter) {
-			console.log("no feature on click disable");
-			toggleSpatialFilter(busLayerView, false);
-			return;
-		}
-	});
+	handleClickEvent(event);
 });
 
 // create a popup watcher for a spatial filter of bus stops
@@ -231,6 +118,58 @@ reactiveUtils.watch(
 		}
 	}
 );
+
+// controllers
+function initPOILayer(layerView) {
+	const categories = [];
+	const uniqueValueInfos = poiLayer.renderer.toJSON().uniqueValueInfos.map((el) => {
+		categories.push(el.value);
+		const symbol = getUniqueValueSymbol(el.symbol);
+		return {value: el.value, symbol};
+	});
+	poiRenderer.uniqueValueInfos = uniqueValueInfos;
+	poiLayer.renderer = poiRenderer;
+
+	const filterNode = document.createElement("div");
+	filterNode.classList.add("filter-widget-container");
+	const filterExpandWidget = createFilterWidget(categories, filterNode);
+	view.ui.add(filterExpandWidget, "top-right");
+
+	filterNode.addEventListener("click", filterByCategory);
+
+	function filterByCategory(event) {
+		const selectedCategory = event.target.getAttribute("category-data");
+
+		layerView.filter = {
+			where: `category_name = '${selectedCategory}'`,
+		};
+
+		if (view.popup.visible) {
+			checkPopupCategory(selectedCategory, poiLayer).then((res) => togglePopup(res, busLayerView));
+		}
+	}
+
+	filterExpandWidget.watch("expanded", () => {
+		if (!filterExpandWidget.expanded) {
+			layerView.filter = null;
+		}
+	});
+}
+
+function handleClickEvent(event) {
+	view.hitTest(event, {include: poiLayer}).then((hitTestResult) => {
+		if (hitTestResult.results.length) {
+			toggleSpatialFilter(busLayerView, true, hitTestResult.results[0].graphic.geometry);
+			return;
+		}
+
+		if (busLayerView.filter) {
+			console.log("no feature on click disable");
+			toggleSpatialFilter(busLayerView, false);
+			return;
+		}
+	});
+}
 
 // services
 function createFilterWidget(categories, node) {
@@ -330,8 +269,6 @@ function getUniqueValueSymbol(symbol) {
 			type: "icon",
 			resource: {
 				primitive: "circle",
-				// href: "url", // important note path should be relative to an html file
-				// TODO add icons
 			},
 			size: 20,
 			material: {color: "white"},
